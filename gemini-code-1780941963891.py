@@ -53,7 +53,6 @@ with st.sidebar:
         st.success(f"Active Master: {uploaded_file.name}")
 
 # --- MAIN TWO-COLUMN SPLIT LAYER ---
-# Adjusting column ratios dynamically (3.2 parts Left Area, 1.8 parts Right Sidebar Zone)
 col1, col2 = st.columns([32, 18], gap="large")
 
 # =====================================================================
@@ -112,136 +111,73 @@ with col1:
 
 
 # =====================================================================
-# RIGHT COLUMN: COLLAPSIBLE & INDIVIDUALLY SCALABLE RIGHT SIDEBAR
+# RIGHT COLUMN: COLLAPSIBLE & DRAG-SCALABLE SIDEBAR
 # =====================================================================
 with col2:
     st.subheader("🛠️ Multitasking Sidebar")
     
     # -----------------------------------------------------------------
-    # COMPONENT 1: COLLAPSIBLE & ADJUSTABLE LECTURE WINDOW STREAMER
+    # COMPONENT 1: DRAG-TO-SCALE LECTURE WINDOW STREAMER
     # -----------------------------------------------------------------
     with st.expander("📺 Live Class Stream Window", expanded=True):
-        st.write("Stream your Google Meet panel or media tab here. Scale its height inside this container using the slider below.")
+        st.write("Click below to link a window. Grab the **bottom-right corner** of the frame to resize it smoothly.")
         
-        # User dynamic control slider for matching row height scalability
-        video_height_slider = st.slider("Adjust stream screen height (px):", min_value=150, max_value=600, value=250, step=25)
-        
-        # Updated script including explicit track-killing functions to clear out/remove the active window feed cleanly
-        screencast_html = f"""
+        # HTML component containing a CSS native resizable box ('resize: both')
+        screencast_html = """
         <div style="text-align: center; font-family: sans-serif;">
-            <div style="margin-bottom: 8px;">
+            <div style="margin-bottom: 10px;">
                 <button id="startBtn" style="background-color: #4A90E2; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;">Add Meet / Lecture Window</button>
                 <button id="stopBtn" style="background-color: #D9534F; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; display: none;">Remove Window Frame</button>
             </div>
-            <video id="videoElement" autoplay playsinline style="width: 100%; height: {video_height_slider}px; border: 2px solid #ccc; border-radius: 8px; background-color: black; display: none; object-fit: contain;"></video>
+            
+            <div id="resizableContainer" style="resize: both; overflow: auto; width: 100%; height: 260px; min-height: 150px; max-height: 600px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #f9f9f9; display: inline-block;">
+                <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; background-color: black; object-fit: contain; display: none;"></video>
+                <div id="placeholderText" style="color: #666; margin-top: 100px; font-size: 14px;">No active window frame selected</div>
+            </div>
         </div>
 
         <script>
             const startBtn = document.getElementById('startBtn');
             const stopBtn = document.getElementById('stopBtn');
             const videoElement = document.getElementById('videoElement');
+            const placeholderText = document.getElementById('placeholderText');
             let currentStream = null;
 
-            startBtn.addEventListener('click', async () => {{
-                try {{
-                    currentStream = await navigator.mediaDevices.getDisplayMedia({{
-                        video: {{ cursor: "always" }},
+            startBtn.addEventListener('click', async () => {
+                try {
+                    currentStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { cursor: "always" },
                         audio: false
-                    }});
+                    });
                     videoElement.srcObject = currentStream;
                     videoElement.style.display = "block";
+                    placeholderText.style.display = "none";
                     stopBtn.style.display = "inline-block";
                     startBtn.style.display = "none";
                     
-                    // Track if the user manually stops sharing via browser's built-in top bar banner
-                    currentStream.getVideoTracks()[0].addEventListener('ended', () => {{
+                    currentStream.getVideoTracks()[0].addEventListener('ended', () => {
                         clearStream();
-                    }});
-                }} catch (err) {{
-                    console.error("Error capturing browser window layout: " + err);
-                }}
-            }});
+                    });
+                } catch (err) {
+                    console.error("Error capturing workspace setup: " + err);
+                }
+            });
 
-            stopBtn.addEventListener('click', () => {{
+            stopBtn.addEventListener('click', () => {
                 clearStream();
-            }});
+            });
 
-            function clearStream() {{
-                if (currentStream) {{
+            function clearStream() {
+                if (currentStream) {
                     currentStream.getTracks().forEach(track => track.stop());
-                }}
+                }
                 videoElement.srcObject = null;
                 videoElement.style.display = "none";
+                placeholderText.style.display = "block";
                 stopBtn.style.display = "none";
                 startBtn.style.display = "inline-block";
                 currentStream = null;
-            }}
+            }
         </script>
         """
-        st.components.v1.html(screencast_html, height=video_height_slider + 60)
-
-    # -----------------------------------------------------------------
-    # COMPONENT 2: COLLAPSIBLE INTERACTIVE CHAT & HOMEWORK SCANNER
-    # -----------------------------------------------------------------
-    with st.expander("💬 Question & Assignment Scanner", expanded=True):
-        
-        if "document_text" in st.session_state and st.session_state.get("deep_dive") == True:
-            # Scalable custom parameter for chat box expansion
-            chat_container_height = st.slider("Adjust Chat Panel Height (px):", min_value=200, max_value=800, value=350, step=50)
-            
-            st.markdown("📂 **Homework Scan Checker**")
-            student_work_file = st.file_uploader("Upload your work (PDF) to check correctness", type=["pdf"], key="checker_uploader")
-            
-            student_work_text = ""
-            if student_work_file:
-                with st.spinner("Parsing submitted work sheets..."):
-                    student_work_text = extract_text_from_pdf(student_work_file)
-                st.info("⚡ Assignment verified. Type 'Check my homework' below to initiate scanning parameters.")
-
-            # Container block obeying the user specified slider layout sizing
-            chat_container = st.container(height=chat_container_height)
-            for idx, message in enumerate(st.session_state.chat_history):
-                with chat_container.chat_message(message["role"]):
-                    st.markdown(message["content"])
-                    if message["role"] == "assistant":
-                        if st.button(f"📌 Send to Main Area", key=f"pin_{idx}"):
-                            st.session_state.pinned_bot_answer = message["content"]
-                            st.toast("Insight piped successfully to the Pinned Insights tab!")
-                            st.rerun()
-                    
-            # Input response execution layer
-            if user_query := st.chat_input("Ask a question or request grading evaluation..."):
-                with chat_container.chat_message("user"):
-                    st.markdown(user_query)
-                st.session_state.chat_history.append({"role": "user", "content": user_query})
-                
-                if student_work_text != "" and ("check" in user_query.lower() or "homework" in user_query.lower() or "correct" in user_query.lower()):
-                    chat_prompt = (
-                        "You are a strict but helpful grading assistant.\n"
-                        "1. Evaluate the student's submitted work based entirely on the truth found in the Master Source Text.\n"
-                        "2. Cross-reference their steps, math derivations, concepts, or statements.\n"
-                        "3. Point out exactly where they made a mistake, explain why it is wrong based on the master file, and provide the correct methodology.\n\n"
-                        f"MASTER SOURCE TEXT CLARIFICATION:\n{st.session_state.document_text[:25000]}\n\n"
-                        f"STUDENT'S SUBMITTED WORK RECOGNITION:\n{student_work_text[:15000]}\n\n"
-                        "Provide a structured evaluation breakdown."
-                    )
-                else:
-                    chat_prompt = (
-                        "You are an interactive tutor helping a student understand their course material.\n"
-                        "Answer the student's question accurately using the provided source text as your primary truth.\n\n"
-                        f"Source Text Context:\n{st.session_state.document_text[:30000]}\n\n"
-                        f"Student Question: {user_query}"
-                    )
-                
-                with chat_container.chat_message("assistant"):
-                    with st.spinner("Processing analysis blocks..."):
-                        chat_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
-                        st.markdown(chat_response.text)
-                
-                st.session_state.chat_history.append({"role": "assistant", "content": chat_response.text})
-                st.rerun()
-                
-        else:
-            st.info("🔒 This portal automatically activates after clicking the main 'Generate Study Guides' trigger on your left.")
-        
-        # Updated script including explicit track-killing functions to clear out
+        # Giving
