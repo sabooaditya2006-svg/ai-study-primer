@@ -3,6 +3,7 @@ from google import genai
 from google.genai import types
 import pypdf
 import io
+import time
 
 # Setup Streamlit page configuration
 st.set_page_config(page_title="AI Study Primer", page_icon="📚", layout="wide")
@@ -49,27 +50,54 @@ col1, col2 = st.columns([3, 2])
 with col1:
     if "document_text" in st.session_state:
         st.header("📖 Study Materials")
-        
         # Button to trigger the processing
         if st.button("Generate Study Guides", type="primary"):
             with st.spinner("Analyzing document and generating summaries..."):
                 
                 # 1. Generate the Broad Primer
-                primer_prompt = (
-                    "You are an expert educator. Provide a HIGH-LEVEL PRIMER of the following text. "
-                    "Your goal is to prepare the student's brain before they study deeply. "
-                    "Focus on: Broad themes, the core 'Why does this matter?', major vocabulary terms without dense definitions, "
-                    "and a mental roadmap of the material. Keep it incredibly simple, bulleted, and highly scannable."
-                    f"\n\nText:\n{st.session_state.document_text[:40000]}" # Truncating slightly just to stay safe on basic text extraction
-                )
-                
-                primer_response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=primer_prompt,
-                )
-                st.session_state.primer_output = primer_response.text
-                st.session_state.primed = True
+                try:
+                    primer_prompt = (
+                        "You are an expert educator. Provide a HIGH-LEVEL PRIMER of the following text. "
+                        "Your goal is to prepare the student's brain before they study deeply. "
+                        "Focus on: Broad themes, the core 'Why does this matter?', major vocabulary terms without dense definitions, "
+                        "and a mental roadmap of the material. Keep it incredibly simple, bulleted, and highly scannable."
+                        f"\n\nText:\n{st.session_state.document_text[:40000]}"
+                    )
+                    
+                    primer_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=primer_prompt,
+                    )
+                    st.session_state.primer_output = primer_response.text
+                    st.session_state.primed = True
+                except Exception as e:
+                    st.error(f"Failed to generate Broad Primer due to a temporary server error. Please try clicking the button again.")
+                    st.session_state.primed = False
 
+                # Give Google's server a 2-second breather before hitting it with the next big request
+                time.sleep(2)
+
+                # 2. Generate the Deep Dive
+                try:
+                    deep_prompt = (
+                        "You are an expert educator. Provide an exhaustive, DEEP DIVE breakdown of the following text. "
+                        "Explain complex mechanisms, mathematical derivations if any, historical/logical contexts, "
+                        "and subtle nuances. Break it down section by section with clear headings. "
+                        "Do not oversimplify; explain things thoroughly as if preparing someone for a rigorous exam."
+                        f"\n\nText:\n{st.session_state.document_text[:40000]}"
+                    )
+                    
+                    deep_response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=deep_prompt,
+                    )
+                    st.session_state.deep_output = deep_response.text
+                    st.session_state.deep_dive = True
+                except Exception as e:
+                    st.error(f"Failed to generate Deep Dive due to a temporary server error. Please try clicking the button again.")
+                    st.session_state.deep_dive = False
+        
+      
                 # 2. Generate the Deep Dive
                 deep_prompt = (
                     "You are an expert educator. Provide an exhaustive, DEEP DIVE breakdown of the following text. "
