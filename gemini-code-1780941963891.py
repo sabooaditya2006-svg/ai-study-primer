@@ -114,18 +114,17 @@ with col2:
     st.subheader("🛠️ Multitasking Sidebar")
     
     with st.expander("📺 Live Class Stream Window", expanded=True):
-        st.write("Click below to link a window. You can drag **ANY border or corner** to resize it perfectly like an image.")
         
         screencast_html = """
-        <div style="text-align: center; font-family: sans-serif; padding-bottom: 5px;">
-            <div style="margin-bottom: 10px;">
-                <button id="startBtn" style="background-color: #4A90E2; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold;">Add Meet / Lecture Window</button>
-                <button id="stopBtn" style="background-color: #D9534F; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold; display: none;">Remove Window Frame</button>
-            </div>
+        <div style="text-align: center; font-family: sans-serif; position: relative;">
             
-            <div id="resizableContainer" style="width: 100%; height: 260px; min-height: 120px; max-height: 700px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: inline-block; box-sizing: border-box; touch-action: none;">
+            <div id="resizableContainer" style="position: relative; width: 100%; height: 260px; min-height: 120px; max-height: 700px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: flex; align-items: center; justify-content: center; box-sizing: border-box; touch-action: none; overflow: hidden;">
+                
                 <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain; display: none; margin: 0 auto;"></video>
-                <div id="placeholderText" style="color: #999; padding-top: 100px; font-size: 14px;">No active window frame selected</div>
+                
+                <button id="startBtn" style="background: none; border: none; color: #4A90E2; font-size: 56px; line-height: 1; cursor: pointer; font-weight: 300; outline: none; transition: transform 0.2s ease;">+</button>
+                <button id="stopBtn" style="position: absolute; top: 10px; right: 10px; background: rgba(0, 0, 0, 0.6); color: white; border: none; border-radius: 50%; width: 26px; height: 26px; font-size: 16px; font-weight: bold; line-height: 24px; text-align: center; cursor: pointer; display: none; z-index: 99; outline: none; align-items: center; justify-content: center;">&times;</button>
+                
             </div>
         </div>
 
@@ -135,18 +134,19 @@ with col2:
             const startBtn = document.getElementById('startBtn');
             const stopBtn = document.getElementById('stopBtn');
             const videoElement = document.getElementById('videoElement');
-            const placeholderText = document.getElementById('placeholderText');
             const container = document.getElementById('resizableContainer');
             let currentStream = null;
 
+            // Tight wrapper sync with Streamlit frame container boundary
             function syncStreamlitHeight() {
-                const height = container.offsetHeight + 65;
+                const height = container.offsetHeight + 10;
                 window.parent.postMessage({
                     type: 'streamlit:setFrameHeight',
                     height: height
                 }, '*');
             }
 
+            // Omni-directional border tracking config engine
             interact('#resizableContainer').resizable({
                 edges: { left: true, right: true, bottom: true, top: true },
                 listeners: {
@@ -167,12 +167,16 @@ with col2:
                 },
                 modifiers: [
                     interact.modifiers.restrictSize({
-                        min: { width: 200, height: 120 },
+                        min: { width: 180, height: 120 },
                         max: { width: 800, height: 700 }
                     })
                 ],
                 inertia: false
             });
+
+            // Hover styles for interaction micro-feedback
+            startBtn.addEventListener('mouseenter', () => startBtn.style.transform = 'scale(1.15)');
+            startBtn.addEventListener('mouseleave', () => startBtn.style.transform = 'scale(1)');
 
             startBtn.addEventListener('click', async () => {
                 try {
@@ -182,20 +186,21 @@ with col2:
                     });
                     videoElement.srcObject = currentStream;
                     videoElement.style.display = "block";
-                    placeholderText.style.display = "none";
-                    stopBtn.style.display = "inline-block";
                     startBtn.style.display = "none";
+                    stopBtn.style.display = "flex";
+                    container.style.borderStyle = "solid"; // Convert border to solid window frame when active
                     syncStreamlitHeight();
                     
                     currentStream.getVideoTracks()[0].addEventListener('ended', () => {
                         clearStream();
                     });
                 } catch (err) {
-                    console.error("Error capturing workspace setup: " + err);
+                    console.error("Error securing user presentation capture stream: " + err);
                 }
             });
 
-            stopBtn.addEventListener('click', () => {
+            stopBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 clearStream();
             });
 
@@ -205,9 +210,9 @@ with col2:
                 }
                 videoElement.srcObject = null;
                 videoElement.style.display = "none";
-                placeholderText.style.display = "block";
                 stopBtn.style.display = "none";
-                startBtn.style.display = "inline-block";
+                startBtn.style.display = "block";
+                container.style.borderStyle = "dashed"; // Revert to configuration frame
                 currentStream = null;
                 
                 container.style.width = "100%";
@@ -218,10 +223,10 @@ with col2:
                 syncStreamlitHeight();
             }
 
-            setTimeout(syncStreamlitHeight, 500);
+            setTimeout(syncStreamlitHeight, 400);
         </script>
         """
-        st.components.v1.html(screencast_html, height=340)
+        st.components.v1.html(screencast_html, height=280)
 
     # -----------------------------------------------------------------
     # COMPONENT 2: INTERACTIVE CHAT & HOMEWORK SCANNER
@@ -273,9 +278,3 @@ with col2:
                 with chat_container.chat_message("assistant"):
                     with st.spinner("Processing analysis blocks..."):
                         client_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
-                        st.markdown(client_response.text)
-                
-                st.session_state.chat_history.append({"role": "assistant", "content": client_response.text})
-                st.rerun()
-        else:
-            st.info("🔒 This portal automatically activates after clicking the main 'Generate Study Guides' trigger on your left.")
