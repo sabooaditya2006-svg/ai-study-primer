@@ -74,4 +74,208 @@ with col1:
                 )
                 try:
                     response = client.models.generate_content(model='gemini-2.5-flash', contents=combined_prompt)
-                    raw_text
+                    raw_text = response.text
+                    if "---DEEP_DIVE_SPLIT---" in raw_text:
+                        parts = raw_text.split("---DEEP_DIVE_SPLIT---")
+                        st.session_state.primer_output = parts[0].strip()
+                        st.session_state.deep_output = parts[1].strip()
+                    else:
+                        st.session_state.primer_output = raw_text
+                        st.session_state.deep_output = "The model forgot to separate the deep dive."
+                    st.session_state.primed = True
+                    st.session_state.deep_dive = True
+                except Exception as e:
+                    st.error("Google's free tier servers are busy. Please wait 10 seconds and click generate again.")
+
+        if st.session_state.get("primed"):
+            tab1, tab2, tab3 = st.tabs(["🚀 Broad Primer", "🔬 Deep Dive", "📌 Pinned Bot Insights"])
+            
+            with tab1:
+                st.info("💡 **Goal:** Build a basic mental model of the text before trying to memorize data points.")
+                st.markdown(st.session_state.primer_output)
+                
+            with tab2:
+                st.success("🔬 **Goal:** Review the fine details, complex logic, and deep context.")
+                st.markdown(st.session_state.deep_output)
+                
+            with tab3:
+                st.warning("🎯 **Main Display Area:** This tab contains answers you pinned from the chat bot for deep reading.")
+                if st.session_state.pinned_bot_answer:
+                    st.markdown(st.session_state.pinned_bot_answer)
+                else:
+                    st.write("*No answers pinned yet. Use the chat bot on the right and click 'Send to Main Area' to present it here.*")
+    else:
+        st.info("👈 Please upload a master PDF file in the left sidebar to get started!")
+
+# =====================================================================
+# RIGHT COLUMN: MULTITASKING SIDEBAR (Omni-Directional Scaling)
+# =====================================================================
+with col2:
+    st.subheader("🛠️ Multitasking Sidebar")
+    
+    with st.expander("📺 Live Class Stream Window", expanded=True):
+        st.write("Click below to link a window. You can drag **ANY border or corner** to resize it perfectly like an image.")
+        
+        screencast_html = """
+        <div style="text-align: center; font-family: sans-serif; padding-bottom: 5px;">
+            <div style="margin-bottom: 10px;">
+                <button id="startBtn" style="background-color: #4A90E2; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold;">Add Meet / Lecture Window</button>
+                <button id="stopBtn" style="background-color: #D9534F; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold; display: none;">Remove Window Frame</button>
+            </div>
+            
+            <div id="resizableContainer" style="width: 100%; height: 260px; min-height: 120px; max-height: 700px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: inline-block; box-sizing: border-box; touch-action: none;">
+                <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain; display: none; margin: 0 auto;"></video>
+                <div id="placeholderText" style="color: #999; padding-top: 100px; font-size: 14px;">No active window frame selected</div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+        
+        <script>
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const videoElement = document.getElementById('videoElement');
+            const placeholderText = document.getElementById('placeholderText');
+            const container = document.getElementById('resizableContainer');
+            let currentStream = null;
+
+            function syncStreamlitHeight() {
+                const height = container.offsetHeight + 65;
+                window.parent.postMessage({
+                    type: 'streamlit:setFrameHeight',
+                    height: height
+                }, '*');
+            }
+
+            interact('#resizableContainer').resizable({
+                edges: { left: true, right: true, bottom: true, top: true },
+                listeners: {
+                    move (event) {
+                        let { x, y } = event.target.dataset;
+                        x = (parseFloat(x) || 0) + event.deltaRect.left;
+                        y = (parseFloat(y) || 0) + event.deltaRect.top;
+
+                        Object.assign(event.target.style, {
+                            width: `${event.rect.width}px`,
+                            height: `${event.rect.height}px`,
+                            transform: `translate(${x}px, ${y}px)`
+                        });
+
+                        Object.assign(event.target.dataset, { x, y });
+                        syncStreamlitHeight();
+                    }
+                },
+                modifiers: [
+                    interact.modifiers.restrictSize({
+                        min: { width: 200, height: 120 },
+                        max: { width: 800, height: 700 }
+                    })
+                ],
+                inertia: false
+            });
+
+            startBtn.addEventListener('click', async () => {
+                try {
+                    currentStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { cursor: "always" },
+                        audio: false
+                    });
+                    videoElement.srcObject = currentStream;
+                    videoElement.style.display = "block";
+                    placeholderText.style.display = "none";
+                    stopBtn.style.display = "inline-block";
+                    startBtn.style.display = "none";
+                    syncStreamlitHeight();
+                    
+                    currentStream.getVideoTracks()[0].addEventListener('ended', () => {
+                        clearStream();
+                    });
+                } catch (err) {
+                    console.error("Error capturing workspace setup: " + err);
+                }
+            });
+
+            stopBtn.addEventListener('click', () => {
+                clearStream();
+            });
+
+            function clearStream() {
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+                videoElement.srcObject = null;
+                videoElement.style.display = "none";
+                placeholderText.style.display = "block";
+                stopBtn.style.display = "none";
+                startBtn.style.display = "inline-block";
+                currentStream = null;
+                
+                container.style.width = "100%";
+                container.style.height = "260px";
+                container.style.transform = "none";
+                container.dataset.x = 0;
+                container.dataset.y = 0;
+                syncStreamlitHeight();
+            }
+
+            setTimeout(syncStreamlitHeight, 500);
+        </script>
+        """
+        st.components.v1.html(screencast_html, height=340)
+
+    # -----------------------------------------------------------------
+    # COMPONENT 2: INTERACTIVE CHAT & HOMEWORK SCANNER
+    # -----------------------------------------------------------------
+    with st.expander("💬 Question & Assignment Scanner", expanded=True):
+        if "document_text" in st.session_state and st.session_state.get("deep_dive") == True:
+            st.markdown("📂 **Homework Scan Checker**")
+            student_work_file = st.file_uploader("Upload your work (PDF) to check correctness", type=["pdf"], key="checker_uploader")
+            
+            student_work_text = ""
+            if student_work_file:
+                with st.spinner("Parsing submitted work sheets..."):
+                    student_work_text = extract_text_from_pdf(student_work_file)
+                st.info("⚡ Assignment verified. Type 'Check my homework' below to initiate scanning parameters.")
+
+            chat_container = st.container(height=380)
+            for idx, message in enumerate(st.session_state.chat_history):
+                with chat_container.chat_message(message["role"]):
+                    st.markdown(message["content"])
+                    if message["role"] == "assistant":
+                        if st.button(f"📌 Send to Main Area", key=f"pin_{idx}"):
+                            st.session_state.pinned_bot_answer = message["content"]
+                            st.toast("Insight piped successfully to the Pinned Insights tab!")
+                            st.rerun()
+                    
+            if user_query := st.chat_input("Ask a question or request grading evaluation..."):
+                with chat_container.chat_message("user"):
+                    st.markdown(user_query)
+                st.session_state.chat_history.append({"role": "user", "content": user_query})
+                
+                if student_work_text != "" and ("check" in user_query.lower() or "homework" in user_query.lower() or "correct" in user_query.lower()):
+                    chat_prompt = (
+                        "You are a strict but helpful grading assistant.\n"
+                        "1. Evaluate the student's submitted work based entirely on the truth found in the Master Source Text.\n"
+                        "2. Cross-reference their steps, math derivations, concepts, or statements.\n"
+                        "3. Point out exactly where they made a mistake, explain why it is wrong based on the master file, and provide the correct methodology.\n\n"
+                        f"MASTER SOURCE TEXT CLARIFICATION:\n{st.session_state.document_text[:25000]}\n\n"
+                        f"STUDENT'S SUBMITTED WORK RECOGNITION:\n{student_work_text[:15000]}\n\n"
+                        "Provide a structured evaluation breakdown."
+                    )
+                else:
+                    chat_prompt = (
+                        "You are an interactive tutor helping a student understand their course material.\n"
+                        "Answer the student's question accurately using the provided source text as your primary truth.\n\n"
+                        f"Source Text Context:\n{st.session_state.document_text[:30000]}\n\n"
+                        f"Student Question: {user_query}"
+                    )
+                
+                with chat_container.chat_message("assistant"):
+                    with st.spinner("Processing analysis blocks..."):
+                        client_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
+                        st.markdown(client_response.text)
+                
+                st.session_state.chat_history.append({"role": "assistant", "content": client_response.text})
+                st.rerun()
+        else:
+            st.info("🔒 This portal automatically activates after clicking the main 'Generate Study Guides' trigger on your left.")
