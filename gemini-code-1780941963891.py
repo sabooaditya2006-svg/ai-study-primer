@@ -108,7 +108,7 @@ with col1:
         st.info("👈 Please upload a master PDF file in the left sidebar to get started!")
 
 # =====================================================================
-# RIGHT COLUMN: MULTITASKING SIDEBAR (Minimalist Adjustable Window)
+# RIGHT COLUMN: MULTITASKING SIDEBAR (Visible Scale Handle)
 # =====================================================================
 with col2:
     st.subheader("🛠️ Multitasking Sidebar")
@@ -118,12 +118,14 @@ with col2:
         screencast_html = """
         <div style="text-align: left; font-family: sans-serif; position: relative; margin: 0; padding: 0;">
             
-            <div id="liveWindowFrame" style="position: relative; width: 100%; height: 260px; min-height: 140px; max-height: 650px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; resize: both;">
+            <div id="liveWindowFrame" style="position: relative; width: 100%; height: 260px; min-height: 140px; max-height: 650px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden;">
                 
-                <video id="videoPlayer" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill; display: none; margin: 0; padding: 0;"></video>
+                <video id="videoPlayer" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill; display: none; margin: 0; padding: 0; pointer-events: none;"></video>
                 
                 <button id="addStreamBtn" style="background: none; border: none; color: #4A90E2; font-size: 64px; cursor: pointer; font-weight: 300; outline: none; transition: transform 0.2s ease;">+</button>
                 <button id="closeStreamBtn" style="position: absolute; top: 12px; right: 12px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; width: 28px; height: 28px; font-size: 18px; font-weight: normal; line-height: 24px; text-align: center; cursor: pointer; display: none; z-index: 999; outline: none; align-items: center; justify-content: center;">&times;</button>
+                
+                <div id="resizeHandle" style="position: absolute; bottom: 0; right: 0; width: 22px; height: 22px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 40%, rgba(74, 144, 226, 0.8) 40%); border-bottom-right-radius: 6px; z-index: 1000; display: block;"></div>
                 
             </div>
         </div>
@@ -133,24 +135,49 @@ with col2:
             const closeStreamBtn = document.getElementById('closeStreamBtn');
             const videoPlayer = document.getElementById('videoPlayer');
             const windowFrame = document.getElementById('liveWindowFrame');
+            const dragHandle = document.getElementById('resizeHandle');
             let streamInstance = null;
 
-            // Keeps the Streamlit outer frame size synced to preventing inner scrolling
+            // Keeps the Streamlit outer iframe context matched with container size 
             function matchFrameHeight() {
-                const currentHeight = windowFrame.offsetHeight + 20;
+                const currentHeight = windowFrame.offsetHeight + 25;
                 window.parent.postMessage({
                     type: 'streamlit:setFrameHeight',
                     height: currentHeight
                 }, '*');
             }
 
-            // Monitor browser manual sizing inputs directly from CSS resize handle
-            const resizeObserver = new ResizeObserver(() => {
-                matchFrameHeight();
-            });
-            resizeObserver.observe(windowFrame);
+            // Visible Drag Sizing Logic Execution
+            dragHandle.addEventListener('mousedown', initResize, false);
 
-            // Hover interactions
+            function initResize(e) {
+                e.preventDefault();
+                window.addEventListener('mousemove', StartScaling, false);
+                window.addEventListener('mouseup', StopScaling, false);
+            }
+
+            function StartScaling(e) {
+                const rect = windowFrame.getBoundingClientRect();
+                // Width/Height changes derived strictly from current mouse coordinates
+                let newWidth = e.clientX - rect.left;
+                let newHeight = e.clientY - rect.top;
+
+                // Restrict boundary variables safely
+                if (newWidth < 180) newWidth = 180;
+                if (newHeight < 140) newHeight = 140;
+                if (newHeight > 650) newHeight = 650;
+
+                windowFrame.style.width = newWidth + 'px';
+                windowFrame.style.height = newHeight + 'px';
+                matchFrameHeight();
+            }
+
+            function StopScaling(e) {
+                window.removeEventListener('mousemove', StartScaling, false);
+                window.removeEventListener('mouseup', StopScaling, false);
+            }
+
+            // Button animations
             addStreamBtn.addEventListener('mouseenter', () => addStreamBtn.style.transform = 'scale(1.2)');
             addStreamBtn.addEventListener('mouseleave', () => addStreamBtn.style.transform = 'scale(1)');
 
@@ -171,7 +198,7 @@ with col2:
                         resetToDefault();
                     });
                 } catch (err) {
-                    console.log("Stream initialization halted.");
+                    console.log("Stream allocation cancelled.");
                 }
             });
 
@@ -191,7 +218,7 @@ with col2:
                 windowFrame.style.borderStyle = "dashed";
                 streamInstance = null;
                 
-                // Reset scale completely back to standard sketch default
+                // Return explicitly back to defaults
                 windowFrame.style.width = "100%";
                 windowFrame.style.height = "260px";
                 matchFrameHeight();
@@ -200,63 +227,3 @@ with col2:
             window.addEventListener('load', () => {
                 setTimeout(matchFrameHeight, 300);
             });
-        </script>
-        """
-        st.components.v1.html(screencast_html, height=285)
-
-    # -----------------------------------------------------------------
-    # COMPONENT 2: INTERACTIVE CHAT & HOMEWORK SCANNER
-    # -----------------------------------------------------------------
-    with st.expander("💬 Question & Assignment Scanner", expanded=True):
-        if "document_text" in st.session_state and st.session_state.get("deep_dive") == True:
-            st.markdown("📂 **Homework Scan Checker**")
-            student_work_file = st.file_uploader("Upload your work (PDF) to check correctness", type=["pdf"], key="checker_uploader")
-            
-            student_work_text = ""
-            if student_work_file:
-                with st.spinner("Parsing submitted work sheets..."):
-                    student_work_text = extract_text_from_pdf(student_work_file)
-                st.info("⚡ Assignment verified. Type 'Check my homework' below to initiate scanning parameters.")
-
-            chat_container = st.container(height=380)
-            for idx, message in enumerate(st.session_state.chat_history):
-                with chat_container.chat_message(message["role"]):
-                    st.markdown(message["content"])
-                    if message["role"] == "assistant":
-                        if st.button(f"📌 Send to Main Area", key=f"pin_{idx}"):
-                            st.session_state.pinned_bot_answer = message["content"]
-                            st.toast("Insight piped successfully to the Pinned Insights tab!")
-                            st.rerun()
-                    
-            if user_query := st.chat_input("Ask a question or request grading evaluation..."):
-                with chat_container.chat_message("user"):
-                    st.markdown(user_query)
-                st.session_state.chat_history.append({"role": "user", "content": user_query})
-                
-                if student_work_text != "" and ("check" in user_query.lower() or "homework" in user_query.lower() or "correct" in user_query.lower()):
-                    chat_prompt = (
-                        "You are a strict but helpful grading assistant.\n"
-                        "1. Evaluate the student's submitted work based entirely on the truth found in the Master Source Text.\n"
-                        "2. Cross-reference their steps, math derivations, concepts, or statements.\n"
-                        "3. Point out exactly where they made a mistake, explain why it is wrong based on the master file, and provide the correct methodology.\n\n"
-                        f"MASTER SOURCE TEXT CLARIFICATION:\n{st.session_state.document_text[:25000]}\n\n"
-                        f"STUDENT'S SUBMITTED WORK RECOGNITION:\n{student_work_text[:15000]}\n\n"
-                        "Provide a structured evaluation breakdown."
-                    )
-                else:
-                    chat_prompt = (
-                        "You are an interactive tutor helping a student understand their course material.\n"
-                        "Answer the student's question accurately using the provided source text as your primary truth.\n\n"
-                        f"Source Text Context:\n{st.session_state.document_text[:30000]}\n\n"
-                        f"Student Question: {user_query}"
-                    )
-                
-                with chat_container.chat_message("assistant"):
-                    with st.spinner("Processing analysis blocks..."):
-                        client_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
-                        st.markdown(client_response.text)
-                
-                st.session_state.chat_history.append({"role": "assistant", "content": client_response.text})
-                st.rerun()
-        else:
-            st.info("🔒 This portal automatically activates after clicking the main 'Generate Study Guides' trigger on your left.")
