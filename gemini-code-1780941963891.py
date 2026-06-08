@@ -31,7 +31,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Initialize global session variables if they don't exist
 if "pinned_bot_answer" not in st.session_state:
     st.session_state.pinned_bot_answer = ""
 
@@ -88,7 +87,6 @@ with col1:
                 except Exception as e:
                     st.error("Google's free tier servers are busy. Please wait 10 seconds and click generate again.")
 
-        # Display tabs including the Pinned Presentation Tab
         if st.session_state.get("primed"):
             tab1, tab2, tab3 = st.tabs(["🚀 Broad Primer", "🔬 Deep Dive", "📌 Pinned Bot Insights"])
             
@@ -109,39 +107,75 @@ with col1:
     else:
         st.info("👈 Please upload a master PDF file in the left sidebar to get started!")
 
-
 # =====================================================================
-# RIGHT COLUMN: COLLAPSIBLE & DRAG-SCALABLE SIDEBAR
+# RIGHT COLUMN: MULTITASKING SIDEBAR (Omni-Directional Scaling)
 # =====================================================================
 with col2:
     st.subheader("🛠️ Multitasking Sidebar")
     
-    # -----------------------------------------------------------------
-    # COMPONENT 1: DRAG-TO-SCALE LECTURE WINDOW STREAMER
-    # -----------------------------------------------------------------
     with st.expander("📺 Live Class Stream Window", expanded=True):
-        st.write("Click below to link a window. Grab the **bottom-right corner** of the frame to resize it smoothly.")
+        st.write("Click below to link a window. You can drag **ANY border or corner** to resize it perfectly like an image.")
         
-        # HTML component containing a CSS native resizable box ('resize: both')
+        # Injecting Interact.js engine with explicit frame height auto-sync handlers
         screencast_html = """
-        <div style="text-align: center; font-family: sans-serif;">
+        <div style="text-align: center; font-family: sans-serif; padding-bottom: 5px;">
             <div style="margin-bottom: 10px;">
-                <button id="startBtn" style="background-color: #4A90E2; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;">Add Meet / Lecture Window</button>
-                <button id="stopBtn" style="background-color: #D9534F; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; display: none;">Remove Window Frame</button>
+                <button id="startBtn" style="background-color: #4A90E2; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold;">Add Meet / Lecture Window</button>
+                <button id="stopBtn" style="background-color: #D9534F; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold; display: none;">Remove Window Frame</button>
             </div>
             
-            <div id="resizableContainer" style="resize: both; overflow: auto; width: 100%; height: 260px; min-height: 150px; max-height: 600px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #f9f9f9; display: inline-block;">
-                <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; background-color: black; object-fit: contain; display: none;"></video>
-                <div id="placeholderText" style="color: #666; margin-top: 100px; font-size: 14px;">No active window frame selected</div>
+            <div id="resizableContainer" style="width: 100%; height: 260px; min-height: 120px; max-height: 700px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: inline-block; box-sizing: border-box; touch-action: none;">
+                <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain; display: none; margin: 0 auto;"></video>
+                <div id="placeholderText" style="color: #999; padding-top: 100px; font-size: 14px;">No active window frame selected</div>
             </div>
         </div>
 
+        <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+        
         <script>
             const startBtn = document.getElementById('startBtn');
             const stopBtn = document.getElementById('stopBtn');
             const videoElement = document.getElementById('videoElement');
             const placeholderText = document.getElementById('placeholderText');
+            const container = document.getElementById('resizableContainer');
             let currentStream = null;
+
+            // Function to dynamically sync the outer Streamlit iframe size with your drag movements
+            function syncStreamlitHeight() {
+                const height = container.offsetHeight + 65;
+                window.parent.postMessage({
+                    type: 'streamlit:setFrameHeight',
+                    height: height
+                }, '*');
+            }
+
+            // Initialize multi-edge tracking resizing logic
+            interact('#resizableContainer').resizable({
+                edges: { left: true, right: true, bottom: true, top: true },
+                listeners: {
+                    move (event) {
+                        let { x, y } = event.target.dataset;
+                        x = (parseFloat(x) || 0) + event.deltaRect.left;
+                        y = (parseFloat(y) || 0) + event.deltaRect.top;
+
+                        Object.assign(event.target.style, {
+                            width: `${event.rect.width}px`,
+                            height: `${event.rect.height}px`,
+                            transform: `translate(${x}px, ${y}px)`
+                        });
+
+                        Object.assign(event.target.dataset, { x, y });
+                        syncStreamlitHeight();
+                    }
+                },
+                modifiers: [
+                    interact.modifiers.restrictSize({
+                        min: { width: 200, height: 120 },
+                        max: { width: 800, height: 700 }
+                    })
+                ],
+                inertia: false
+            });
 
             startBtn.addEventListener('click', async () => {
                 try {
@@ -154,6 +188,7 @@ with col2:
                     placeholderText.style.display = "none";
                     stopBtn.style.display = "inline-block";
                     startBtn.style.display = "none";
+                    syncStreamlitHeight();
                     
                     currentStream.getVideoTracks()[0].addEventListener('ended', () => {
                         clearStream();
@@ -177,19 +212,28 @@ with col2:
                 stopBtn.style.display = "none";
                 startBtn.style.display = "inline-block";
                 currentStream = null;
+                
+                // Reset to default sizing profile on removal
+                container.style.width = "100%";
+                container.style.height = "260px";
+                container.style.transform = "none";
+                container.dataset.x = 0;
+                container.dataset.y = 0;
+                syncStreamlitHeight();
             }
+
+            // Initial frame calculation load trigger
+            setTimeout(syncStreamlitHeight, 500);
         </script>
         """
-        # Giving the component execution layer a solid 500px boundary buffer to grow cleanly inside the container
-        st.components.v1.html(screencast_html, height=480)
+        # We replace the static height limit with a flexible starting envelope
+        st.components.v1.html(screencast_html, height=340)
 
     # -----------------------------------------------------------------
-    # COMPONENT 2: COLLAPSIBLE INTERACTIVE CHAT & HOMEWORK SCANNER
+    # COMPONENT 2: INTERACTIVE CHAT & HOMEWORK SCANNER
     # -----------------------------------------------------------------
     with st.expander("💬 Question & Assignment Scanner", expanded=True):
-        
         if "document_text" in st.session_state and st.session_state.get("deep_dive") == True:
-            
             st.markdown("📂 **Homework Scan Checker**")
             student_work_file = st.file_uploader("Upload your work (PDF) to check correctness", type=["pdf"], key="checker_uploader")
             
@@ -199,48 +243,5 @@ with col2:
                     student_work_text = extract_text_from_pdf(student_work_file)
                 st.info("⚡ Assignment verified. Type 'Check my homework' below to initiate scanning parameters.")
 
-            # Static comfortable size for chat block logs
             chat_container = st.container(height=380)
             for idx, message in enumerate(st.session_state.chat_history):
-                with chat_container.chat_message(message["role"]):
-                    st.markdown(message["content"])
-                    if message["role"] == "assistant":
-                        if st.button(f"📌 Send to Main Area", key=f"pin_{idx}"):
-                            st.session_state.pinned_bot_answer = message["content"]
-                            st.toast("Insight piped successfully to the Pinned Insights tab!")
-                            st.rerun()
-                    
-            # Input response execution layer
-            if user_query := st.chat_input("Ask a question or request grading evaluation..."):
-                with chat_container.chat_message("user"):
-                    st.markdown(user_query)
-                st.session_state.chat_history.append({"role": "user", "content": user_query})
-                
-                if student_work_text != "" and ("check" in user_query.lower() or "homework" in user_query.lower() or "correct" in user_query.lower()):
-                    chat_prompt = (
-                        "You are a strict but helpful grading assistant.\n"
-                        "1. Evaluate the student's submitted work based entirely on the truth found in the Master Source Text.\n"
-                        "2. Cross-reference their steps, math derivations, concepts, or statements.\n"
-                        "3. Point out exactly where they made a mistake, explain why it is wrong based on the master file, and provide the correct methodology.\n\n"
-                        f"MASTER SOURCE TEXT CLARIFICATION:\n{st.session_state.document_text[:25000]}\n\n"
-                        f"STUDENT'S SUBMITTED WORK RECOGNITION:\n{student_work_text[:15000]}\n\n"
-                        "Provide a structured evaluation breakdown."
-                    )
-                else:
-                    chat_prompt = (
-                        "You are an interactive tutor helping a student understand their course material.\n"
-                        "Answer the student's question accurately using the provided source text as your primary truth.\n\n"
-                        f"Source Text Context:\n{st.session_state.document_text[:30000]}\n\n"
-                        f"Student Question: {user_query}"
-                    )
-                
-                with chat_container.chat_message("assistant"):
-                    with st.spinner("Processing analysis blocks..."):
-                        client_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
-                        st.markdown(client_response.text)
-                
-                st.session_state.chat_history.append({"role": "assistant", "content": client_response.text})
-                st.rerun()
-                
-        else:
-            st.info("🔒 This portal automatically activates after clicking the main 'Generate Study Guides' trigger on your left.")
