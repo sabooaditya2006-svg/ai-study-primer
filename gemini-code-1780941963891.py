@@ -180,4 +180,67 @@ with col2:
             }
         </script>
         """
-        # Giving
+        # Giving the component execution layer a solid 500px boundary buffer to grow cleanly inside the container
+        st.components.v1.html(screencast_html, height=480)
+
+    # -----------------------------------------------------------------
+    # COMPONENT 2: COLLAPSIBLE INTERACTIVE CHAT & HOMEWORK SCANNER
+    # -----------------------------------------------------------------
+    with st.expander("💬 Question & Assignment Scanner", expanded=True):
+        
+        if "document_text" in st.session_state and st.session_state.get("deep_dive") == True:
+            
+            st.markdown("📂 **Homework Scan Checker**")
+            student_work_file = st.file_uploader("Upload your work (PDF) to check correctness", type=["pdf"], key="checker_uploader")
+            
+            student_work_text = ""
+            if student_work_file:
+                with st.spinner("Parsing submitted work sheets..."):
+                    student_work_text = extract_text_from_pdf(student_work_file)
+                st.info("⚡ Assignment verified. Type 'Check my homework' below to initiate scanning parameters.")
+
+            # Static comfortable size for chat block logs
+            chat_container = st.container(height=380)
+            for idx, message in enumerate(st.session_state.chat_history):
+                with chat_container.chat_message(message["role"]):
+                    st.markdown(message["content"])
+                    if message["role"] == "assistant":
+                        if st.button(f"📌 Send to Main Area", key=f"pin_{idx}"):
+                            st.session_state.pinned_bot_answer = message["content"]
+                            st.toast("Insight piped successfully to the Pinned Insights tab!")
+                            st.rerun()
+                    
+            # Input response execution layer
+            if user_query := st.chat_input("Ask a question or request grading evaluation..."):
+                with chat_container.chat_message("user"):
+                    st.markdown(user_query)
+                st.session_state.chat_history.append({"role": "user", "content": user_query})
+                
+                if student_work_text != "" and ("check" in user_query.lower() or "homework" in user_query.lower() or "correct" in user_query.lower()):
+                    chat_prompt = (
+                        "You are a strict but helpful grading assistant.\n"
+                        "1. Evaluate the student's submitted work based entirely on the truth found in the Master Source Text.\n"
+                        "2. Cross-reference their steps, math derivations, concepts, or statements.\n"
+                        "3. Point out exactly where they made a mistake, explain why it is wrong based on the master file, and provide the correct methodology.\n\n"
+                        f"MASTER SOURCE TEXT CLARIFICATION:\n{st.session_state.document_text[:25000]}\n\n"
+                        f"STUDENT'S SUBMITTED WORK RECOGNITION:\n{student_work_text[:15000]}\n\n"
+                        "Provide a structured evaluation breakdown."
+                    )
+                else:
+                    chat_prompt = (
+                        "You are an interactive tutor helping a student understand their course material.\n"
+                        "Answer the student's question accurately using the provided source text as your primary truth.\n\n"
+                        f"Source Text Context:\n{st.session_state.document_text[:30000]}\n\n"
+                        f"Student Question: {user_query}"
+                    )
+                
+                with chat_container.chat_message("assistant"):
+                    with st.spinner("Processing analysis blocks..."):
+                        client_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
+                        st.markdown(client_response.text)
+                
+                st.session_state.chat_history.append({"role": "assistant", "content": client_response.text})
+                st.rerun()
+                
+        else:
+            st.info("🔒 This portal automatically activates after clicking the main 'Generate Study Guides' trigger on your left.")
