@@ -85,7 +85,7 @@ with col1:
                     st.session_state.primed = True
                     st.session_state.deep_dive = True
                 except Exception as e:
-                    st.error("Google's free tier servers are busy. Please wait 10 seconds and click generate again.")
+                    st.error("Server is busy. Please wait a moment and click generate again.")
 
         if st.session_state.get("primed"):
             tab1, tab2, tab3 = st.tabs(["🚀 Broad Primer", "🔬 Deep Dive", "📌 Pinned Bot Insights"])
@@ -108,7 +108,7 @@ with col1:
         st.info("👈 Please upload a master PDF file in the left sidebar to get started!")
 
 # =====================================================================
-# RIGHT COLUMN: MULTITASKING SIDEBAR (Omni-Directional Scaling)
+# RIGHT COLUMN: MULTITASKING SIDEBAR (Minimalist Adjustable Window)
 # =====================================================================
 with col2:
     st.subheader("🛠️ Multitasking Sidebar")
@@ -116,120 +116,93 @@ with col2:
     with st.expander("📺 Live Class Stream Window", expanded=True):
         
         screencast_html = """
-        <div style="text-align: left; font-family: sans-serif; position: relative;">
+        <div style="text-align: left; font-family: sans-serif; position: relative; margin: 0; padding: 0;">
             
-            <div id="resizableContainer" style="position: relative; width: 100%; height: 260px; min-height: 120px; max-height: 700px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: flex; align-items: center; justify-content: center; box-sizing: border-box; touch-action: none; overflow: hidden;">
+            <div id="liveWindowFrame" style="position: relative; width: 100%; height: 260px; min-height: 140px; max-height: 650px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; resize: both;">
                 
-                <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill; display: none; margin: 0; padding: 0; border: none;"></video>
+                <video id="videoPlayer" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill; display: none; margin: 0; padding: 0;"></video>
                 
-                <button id="startBtn" style="background: none; border: none; color: #4A90E2; font-size: 56px; line-height: 1; cursor: pointer; font-weight: 300; outline: none; transition: transform 0.2s ease;">+</button>
-                <button id="stopBtn" style="position: absolute; top: 10px; right: 10px; background: rgba(0, 0, 0, 0.6); color: white; border: none; border-radius: 50%; width: 26px; height: 26px; font-size: 16px; font-weight: bold; line-height: 24px; text-align: center; cursor: pointer; display: none; z-index: 99; outline: none; align-items: center; justify-content: center;">&times;</button>
+                <button id="addStreamBtn" style="background: none; border: none; color: #4A90E2; font-size: 64px; cursor: pointer; font-weight: 300; outline: none; transition: transform 0.2s ease;">+</button>
+                <button id="closeStreamBtn" style="position: absolute; top: 12px; right: 12px; background: rgba(0, 0, 0, 0.7); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; width: 28px; height: 28px; font-size: 18px; font-weight: normal; line-height: 24px; text-align: center; cursor: pointer; display: none; z-index: 999; outline: none; align-items: center; justify-content: center;">&times;</button>
                 
             </div>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
-        
         <script>
-            const startBtn = document.getElementById('startBtn');
-            const stopBtn = document.getElementById('stopBtn');
-            const videoElement = document.getElementById('videoElement');
-            const container = document.getElementById('resizableContainer');
-            let currentStream = null;
+            const addStreamBtn = document.getElementById('addStreamBtn');
+            const closeStreamBtn = document.getElementById('closeStreamBtn');
+            const videoPlayer = document.getElementById('videoPlayer');
+            const windowFrame = document.getElementById('liveWindowFrame');
+            let streamInstance = null;
 
-            // Tight wrapper sync with Streamlit frame container boundary
-            function syncStreamlitHeight() {
-                const height = container.offsetHeight + 15;
+            // Keeps the Streamlit outer frame size synced to preventing inner scrolling
+            function matchFrameHeight() {
+                const currentHeight = windowFrame.offsetHeight + 20;
                 window.parent.postMessage({
                     type: 'streamlit:setFrameHeight',
-                    height: height
+                    height: currentHeight
                 }, '*');
             }
 
-            // Locked-position scaling engine
-            interact('#resizableContainer').resizable({
-                edges: { right: true, bottom: true },
-                listeners: {
-                    move (event) {
-                        const targetWidth = `${event.rect.width}px`;
-                        const targetHeight = `${event.rect.height}px`;
-
-                        // FORCE both parent box and internal video elements to map explicit dimensions simultaneously
-                        container.style.width = targetWidth;
-                        container.style.height = targetHeight;
-                        
-                        videoElement.style.width = targetWidth;
-                        videoElement.style.height = targetHeight;
-
-                        syncStreamlitHeight();
-                    }
-                },
-                modifiers: [
-                    interact.modifiers.restrictSize({
-                        min: { width: 180, height: 120 },
-                        max: { width: 800, height: 700 }
-                    })
-                ],
-                inertia: false
+            // Monitor browser manual sizing inputs directly from CSS resize handle
+            const resizeObserver = new ResizeObserver(() => {
+                matchFrameHeight();
             });
+            resizeObserver.observe(windowFrame);
 
-            // Micro-feedback configurations
-            startBtn.addEventListener('mouseenter', () => startBtn.style.transform = 'scale(1.15)');
-            startBtn.addEventListener('mouseleave', () => startBtn.style.transform = 'scale(1)');
+            // Hover interactions
+            addStreamBtn.addEventListener('mouseenter', () => addStreamBtn.style.transform = 'scale(1.2)');
+            addStreamBtn.addEventListener('mouseleave', () => addStreamBtn.style.transform = 'scale(1)');
 
-            startBtn.addEventListener('click', async () => {
+            addStreamBtn.addEventListener('click', async () => {
                 try {
-                    currentStream = await navigator.mediaDevices.getDisplayMedia({
+                    streamInstance = await navigator.mediaDevices.getDisplayMedia({
                         video: { cursor: "always" },
                         audio: false
                     });
-                    videoElement.srcObject = currentStream;
-                    videoElement.style.display = "block";
-                    startBtn.style.display = "none";
-                    stopBtn.style.display = "flex";
-                    container.style.borderStyle = "solid";
+                    videoPlayer.srcObject = streamInstance;
+                    videoPlayer.style.display = "block";
+                    addStreamBtn.style.display = "none";
+                    closeStreamBtn.style.display = "flex";
+                    windowFrame.style.borderStyle = "solid";
+                    matchFrameHeight();
                     
-                    // Core initialization to match current base layer sizing
-                    videoElement.style.width = container.style.width || "100%";
-                    videoElement.style.height = container.style.height || "260px";
-                    
-                    syncStreamlitHeight();
-                    
-                    currentStream.getVideoTracks()[0].addEventListener('ended', () => {
-                        clearStream();
+                    streamInstance.getVideoTracks()[0].addEventListener('ended', () => {
+                        resetToDefault();
                     });
                 } catch (err) {
-                    console.error("Capture selection context terminated: " + err);
+                    console.log("Stream initialization halted.");
                 }
             });
 
-            stopBtn.addEventListener('click', (e) => {
+            closeStreamBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                clearStream();
+                resetToDefault();
             });
 
-            function clearStream() {
-                if (currentStream) {
-                    currentStream.getTracks().forEach(track => track.stop());
+            function resetToDefault() {
+                if (streamInstance) {
+                    streamInstance.getTracks().forEach(track => track.stop());
                 }
-                videoElement.srcObject = null;
-                videoElement.style.display = "none";
-                stopBtn.style.display = "none";
-                startBtn.style.display = "block";
-                container.style.borderStyle = "dashed";
-                currentStream = null;
+                videoPlayer.srcObject = null;
+                videoPlayer.style.display = "none";
+                closeStreamBtn.style.display = "none";
+                addStreamBtn.style.display = "block";
+                windowFrame.style.borderStyle = "dashed";
+                streamInstance = null;
                 
-                container.style.width = "100%";
-                container.style.height = "260px";
-                videoElement.style.width = "100%";
-                videoElement.style.height = "100%";
-                syncStreamlitHeight();
+                // Reset scale completely back to standard sketch default
+                windowFrame.style.width = "100%";
+                windowFrame.style.height = "260px";
+                matchFrameHeight();
             }
 
-            setTimeout(syncStreamlitHeight, 400);
+            window.addEventListener('load', () => {
+                setTimeout(matchFrameHeight, 300);
+            });
         </script>
         """
-        st.components.v1.html(screencast_html, height=280)
+        st.components.v1.html(screencast_html, height=285)
 
     # -----------------------------------------------------------------
     # COMPONENT 2: INTERACTIVE CHAT & HOMEWORK SCANNER
