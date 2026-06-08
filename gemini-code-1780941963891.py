@@ -4,7 +4,7 @@ from google.genai import types
 import pypdf
 import io
 
-# Setup Streamlit page configuration
+# Setup Streamlit page configuration to use full display width
 st.set_page_config(page_title="AI Study Primer", page_icon="📚", layout="wide")
 
 # Initialize Gemini Client
@@ -21,7 +21,7 @@ def extract_text_from_pdf(uploaded_file):
         text += page.extract_text() + "\n"
     return text
 
-# --- SECTION 1: TOP STRIP (Website Name Banner) ---
+# --- TOP STRIP: Website Name Banner ---
 st.markdown(
     """
     <div style="background-color:#4A90E2;padding:10px;border-radius:10px;margin-bottom:20px;">
@@ -35,7 +35,7 @@ st.markdown(
 if "pinned_bot_answer" not in st.session_state:
     st.session_state.pinned_bot_answer = ""
 
-# Sidebar for master material file upload
+# Left Sidebar for master material file upload
 with st.sidebar:
     st.header("Master Course Material")
     uploaded_file = st.file_uploader("Upload Master PDF (Lecture/Textbook)", type=["pdf"], key="master_uploader")
@@ -52,11 +52,12 @@ with st.sidebar:
                 st.session_state.chat_history = []
         st.success(f"Active Master: {uploaded_file.name}")
 
-# Layout split: Left side (Main Area), Right side (Multitasking Column)
-col1, col2 = st.columns([3, 2], gap="large")
+# --- MAIN TWO-COLUMN SPLIT LAYER ---
+# Adjusting column ratios dynamically (3.2 parts Left Area, 1.8 parts Right Sidebar Zone)
+col1, col2 = st.columns([32, 18], gap="large")
 
 # =====================================================================
-# LEFT COLUMN: MAIN STUDY AREA (Primer, Deep Dive, & Pinned Answers)
+# LEFT COLUMN: MAIN STUDY AREA
 # =====================================================================
 with col1:
     if "document_text" in st.session_state and st.session_state.document_text.strip() != "":
@@ -88,7 +89,7 @@ with col1:
                 except Exception as e:
                     st.error("Google's free tier servers are busy. Please wait 10 seconds and click generate again.")
 
-        # Display tabs including the new Pinned Presentation Tab
+        # Display tabs including the Pinned Presentation Tab
         if st.session_state.get("primed"):
             tab1, tab2, tab3 = st.tabs(["🚀 Broad Primer", "🔬 Deep Dive", "📌 Pinned Bot Insights"])
             
@@ -107,105 +108,140 @@ with col1:
                 else:
                     st.write("*No answers pinned yet. Use the chat bot on the right and click 'Send to Main Area' to present it here.*")
     else:
-        st.info("👈 Please upload a master PDF file in the sidebar to get started!")
+        st.info("👈 Please upload a master PDF file in the left sidebar to get started!")
+
 
 # =====================================================================
-# RIGHT COLUMN: THREE-PART MULTITASKING ZONE
+# RIGHT COLUMN: COLLAPSIBLE & INDIVIDUALLY SCALABLE RIGHT SIDEBAR
 # =====================================================================
 with col2:
-    # Part 1: Small Name Strip (Already placed at the absolute top of the app)
+    st.subheader("🛠️ Multitasking Sidebar")
     
-    # Part 2: Live Window Streamer (HTML5 Video Element via iframe trick)
-    st.subheader("📺 Live Class Stream")
-    st.write("Click below to sync your Google Meet/Lecture window directly into your workspace view.")
-    
-    # Custom HTML/JS component that grabs your browser screen sharing feed and scales it dynamically
-    screencast_html = """
-    <div style="text-align: center; font-family: sans-serif;">
-        <button id="startBtn" style="background-color: #4A90E2; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Select Lecture/Meet Window</button>
-        <video id="videoElement" autoplay playsinline style="width: 100%; max-height: 250px; margin-top: 10px; border: 2px solid #ccc; border-radius: 8px; background-color: black; display: none;"></video>
-    </div>
-
-    <script>
-        const startBtn = document.getElementById('startBtn');
-        const videoElement = document.getElementById('videoElement');
-
-        startBtn.addEventListener('click', async () => {
-            try {
-                const mediaStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: "always" },
-                    audio: false
-                });
-                videoElement.srcObject = mediaStream;
-                videoElement.style.display = "block";
-                startBtn.style.display = "none";
-            } catch (err) {
-                console.error("Error capturing screen: " + err);
-            }
-        });
-    </script>
-    """
-    st.components.v1.html(screencast_html, height=310)
-    st.write("---")
-    
-    # Part 3: Interactive Chat + Homework Scanner
-    st.subheader("💬 Question & Assignment Scanner")
-    
-    if "document_text" in st.session_state and st.session_state.get("deep_dive") == True:
-        # Homework Checker Uploader
-        st.markdown("📂 **Homework Scan Checker**")
-        student_work_file = st.file_uploader("Upload your work (PDF) to check correctness against the master text", type=["pdf"], key="checker_uploader")
+    # -----------------------------------------------------------------
+    # COMPONENT 1: COLLAPSIBLE & ADJUSTABLE LECTURE WINDOW STREAMER
+    # -----------------------------------------------------------------
+    with st.expander("📺 Live Class Stream Window", expanded=True):
+        st.write("Stream your Google Meet panel or media tab here. Scale its height inside this container using the slider below.")
         
-        student_work_text = ""
-        if student_work_file:
-            with st.spinner("Parsing your submitted work..."):
-                student_work_text = extract_text_from_pdf(student_work_file)
-            st.info("⚡ Homework parsed. Ask the bot below: *'Check my homework'* to process evaluation.")
+        # User dynamic control slider for matching row height scalability
+        video_height_slider = st.slider("Adjust stream screen height (px):", min_value=150, max_value=600, value=250, step=25)
+        
+        # Updated script including explicit track-killing functions to clear out/remove the active window feed cleanly
+        screencast_html = f"""
+        <div style="text-align: center; font-family: sans-serif;">
+            <div style="margin-bottom: 8px;">
+                <button id="startBtn" style="background-color: #4A90E2; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px;">Add Meet / Lecture Window</button>
+                <button id="stopBtn" style="background-color: #D9534F; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 13px; display: none;">Remove Window Frame</button>
+            </div>
+            <video id="videoElement" autoplay playsinline style="width: 100%; height: {video_height_slider}px; border: 2px solid #ccc; border-radius: 8px; background-color: black; display: none; object-fit: contain;"></video>
+        </div>
 
-        # Container to display chat messages cleanly
-        chat_container = st.container(height=350)
-        for idx, message in enumerate(st.session_state.chat_history):
-            with chat_container.chat_message(message["role"]):
-                st.markdown(message["content"])
-                # If it's an assistant response, give an option to pin it to the main left area
-                if message["role"] == "assistant":
-                    if st.button(f"📌 Send to Main Area", key=f"pin_{idx}"):
-                        st.session_state.pinned_bot_answer = message["content"]
-                        st.toast("Insight sent to 'Pinned Bot Insights' tab!")
-                        st.rerun()
+        <script>
+            const startBtn = document.getElementById('startBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const videoElement = document.getElementById('videoElement');
+            let currentStream = null;
+
+            startBtn.addEventListener('click', async () => {{
+                try {{
+                    currentStream = await navigator.mediaDevices.getDisplayMedia({{
+                        video: {{ cursor: "always" }},
+                        audio: false
+                    }});
+                    videoElement.srcObject = currentStream;
+                    videoElement.style.display = "block";
+                    stopBtn.style.display = "inline-block";
+                    startBtn.style.display = "none";
+                    
+                    // Track if the user manually stops sharing via browser's built-in top bar banner
+                    currentStream.getVideoTracks()[0].addEventListener('ended', () => {{
+                        clearStream();
+                    }});
+                }} catch (err) {{
+                    console.error("Error capturing browser window layout: " + err);
+                }}
+            }});
+
+            stopBtn.addEventListener('click', () => {{
+                clearStream();
+            }});
+
+            function clearStream() {{
+                if (currentStream) {{
+                    currentStream.getTracks().forEach(track => track.stop());
+                }}
+                videoElement.srcObject = null;
+                videoElement.style.display = "none";
+                stopBtn.style.display = "none";
+                startBtn.style.display = "inline-block";
+                currentStream = null;
+            }}
+        </script>
+        """
+        st.components.v1.html(screencast_html, height=video_height_slider + 60)
+
+    # -----------------------------------------------------------------
+    # COMPONENT 2: COLLAPSIBLE INTERACTIVE CHAT & HOMEWORK SCANNER
+    # -----------------------------------------------------------------
+    with st.expander("💬 Question & Assignment Scanner", expanded=True):
+        
+        if "document_text" in st.session_state and st.session_state.get("deep_dive") == True:
+            # Scalable custom parameter for chat box expansion
+            chat_container_height = st.slider("Adjust Chat Panel Height (px):", min_value=200, max_value=800, value=350, step=50)
+            
+            st.markdown("📂 **Homework Scan Checker**")
+            student_work_file = st.file_uploader("Upload your work (PDF) to check correctness", type=["pdf"], key="checker_uploader")
+            
+            student_work_text = ""
+            if student_work_file:
+                with st.spinner("Parsing submitted work sheets..."):
+                    student_work_text = extract_text_from_pdf(student_work_file)
+                st.info("⚡ Assignment verified. Type 'Check my homework' below to initiate scanning parameters.")
+
+            # Container block obeying the user specified slider layout sizing
+            chat_container = st.container(height=chat_container_height)
+            for idx, message in enumerate(st.session_state.chat_history):
+                with chat_container.chat_message(message["role"]):
+                    st.markdown(message["content"])
+                    if message["role"] == "assistant":
+                        if st.button(f"📌 Send to Main Area", key=f"pin_{idx}"):
+                            st.session_state.pinned_bot_answer = message["content"]
+                            st.toast("Insight piped successfully to the Pinned Insights tab!")
+                            st.rerun()
+                    
+            # Input response execution layer
+            if user_query := st.chat_input("Ask a question or request grading evaluation..."):
+                with chat_container.chat_message("user"):
+                    st.markdown(user_query)
+                st.session_state.chat_history.append({"role": "user", "content": user_query})
                 
-        # Chat input field
-        if user_query := st.chat_input("Ask a question or type 'Check my homework'"):
-            with chat_container.chat_message("user"):
-                st.markdown(user_query)
-            st.session_state.chat_history.append({"role": "user", "content": user_query})
-            
-            # Construct a smart context prompt that alters itself if a user uploaded homework
-            if student_work_text != "" and ("check" in user_query.lower() or "homework" in user_query.lower() or "correct" in user_query.lower()):
-                chat_prompt = (
-                    "You are a strict but helpful grading assistant.\n"
-                    "1. Evaluate the student's submitted work based entirely on the truth found in the Master Source Text.\n"
-                    "2. Cross-reference their steps, math derivations, concepts, or statements.\n"
-                    "3. Point out exactly where they made a mistake, explain why it is wrong based on the master file, and provide the correct methodology.\n\n"
-                    f"MASTER SOURCE TEXT CLARIFICATION:\n{st.session_state.document_text[:25000]}\n\n"
-                    f"STUDENT'S SUBMITTED WORK RECOGNITION:\n{student_work_text[:15000]}\n\n"
-                    "Provide a structured evaluation breakdown."
-                )
-            else:
-                chat_prompt = (
-                    "You are an interactive tutor helping a student understand their course material.\n"
-                    "Answer the student's question accurately using the provided source text as your primary truth.\n\n"
-                    f"Source Text Context:\n{st.session_state.document_text[:30000]}\n\n"
-                    f"Student Question: {user_query}"
-                )
-            
-            with chat_container.chat_message("assistant"):
-                with st.spinner("Analyzing data frameworks..."):
-                    chat_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
-                    st.markdown(chat_response.text)
-            
-            st.session_state.chat_history.append({"role": "assistant", "content": chat_response.text})
-            st.rerun()
-            
-    else:
-        st.info("🔒 The assignment scanner and chatbot will activate once your master study guides finish generating on the left.")
+                if student_work_text != "" and ("check" in user_query.lower() or "homework" in user_query.lower() or "correct" in user_query.lower()):
+                    chat_prompt = (
+                        "You are a strict but helpful grading assistant.\n"
+                        "1. Evaluate the student's submitted work based entirely on the truth found in the Master Source Text.\n"
+                        "2. Cross-reference their steps, math derivations, concepts, or statements.\n"
+                        "3. Point out exactly where they made a mistake, explain why it is wrong based on the master file, and provide the correct methodology.\n\n"
+                        f"MASTER SOURCE TEXT CLARIFICATION:\n{st.session_state.document_text[:25000]}\n\n"
+                        f"STUDENT'S SUBMITTED WORK RECOGNITION:\n{student_work_text[:15000]}\n\n"
+                        "Provide a structured evaluation breakdown."
+                    )
+                else:
+                    chat_prompt = (
+                        "You are an interactive tutor helping a student understand their course material.\n"
+                        "Answer the student's question accurately using the provided source text as your primary truth.\n\n"
+                        f"Source Text Context:\n{st.session_state.document_text[:30000]}\n\n"
+                        f"Student Question: {user_query}"
+                    )
+                
+                with chat_container.chat_message("assistant"):
+                    with st.spinner("Processing analysis blocks..."):
+                        chat_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
+                        st.markdown(chat_response.text)
+                
+                st.session_state.chat_history.append({"role": "assistant", "content": chat_response.text})
+                st.rerun()
+                
+        else:
+            st.info("🔒 This portal automatically activates after clicking the main 'Generate Study Guides' trigger on your left.")
+        
+        # Updated script including explicit track-killing functions to clear out
