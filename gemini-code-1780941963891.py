@@ -116,11 +116,11 @@ with col2:
     with st.expander("📺 Live Class Stream Window", expanded=True):
         
         screencast_html = """
-        <div style="text-align: center; font-family: sans-serif; position: relative;">
+        <div style="text-align: left; font-family: sans-serif; position: relative;">
             
             <div id="resizableContainer" style="position: relative; width: 100%; height: 260px; min-height: 120px; max-height: 700px; border: 2px dashed #4A90E2; border-radius: 8px; background-color: #111; display: flex; align-items: center; justify-content: center; box-sizing: border-box; touch-action: none; overflow: hidden;">
                 
-                <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain; display: none; margin: 0 auto;"></video>
+                <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: fill; display: none; margin: 0; padding: 0; border: none;"></video>
                 
                 <button id="startBtn" style="background: none; border: none; color: #4A90E2; font-size: 56px; line-height: 1; cursor: pointer; font-weight: 300; outline: none; transition: transform 0.2s ease;">+</button>
                 <button id="stopBtn" style="position: absolute; top: 10px; right: 10px; background: rgba(0, 0, 0, 0.6); color: white; border: none; border-radius: 50%; width: 26px; height: 26px; font-size: 16px; font-weight: bold; line-height: 24px; text-align: center; cursor: pointer; display: none; z-index: 99; outline: none; align-items: center; justify-content: center;">&times;</button>
@@ -139,29 +139,23 @@ with col2:
 
             // Tight wrapper sync with Streamlit frame container boundary
             function syncStreamlitHeight() {
-                const height = container.offsetHeight + 10;
+                const height = container.offsetHeight + 15;
                 window.parent.postMessage({
                     type: 'streamlit:setFrameHeight',
                     height: height
                 }, '*');
             }
 
-            // Omni-directional border tracking config engine
+            // Locked-position scaling (Only right and bottom drag anchors enabled)
             interact('#resizableContainer').resizable({
-                edges: { left: true, right: true, bottom: true, top: true },
+                edges: { right: true, bottom: true },
                 listeners: {
                     move (event) {
-                        let { x, y } = event.target.dataset;
-                        x = (parseFloat(x) || 0) + event.deltaRect.left;
-                        y = (parseFloat(y) || 0) + event.deltaRect.top;
-
+                        // Apply dimensions directly to change size natively without translations
                         Object.assign(event.target.style, {
                             width: `${event.rect.width}px`,
-                            height: `${event.rect.height}px`,
-                            transform: `translate(${x}px, ${y}px)`
+                            height: `${event.rect.height}px`
                         });
-
-                        Object.assign(event.target.dataset, { x, y });
                         syncStreamlitHeight();
                     }
                 },
@@ -174,7 +168,7 @@ with col2:
                 inertia: false
             });
 
-            // Hover styles for interaction micro-feedback
+            // Micro-feedback configurations
             startBtn.addEventListener('mouseenter', () => startBtn.style.transform = 'scale(1.15)');
             startBtn.addEventListener('mouseleave', () => startBtn.style.transform = 'scale(1)');
 
@@ -188,14 +182,14 @@ with col2:
                     videoElement.style.display = "block";
                     startBtn.style.display = "none";
                     stopBtn.style.display = "flex";
-                    container.style.borderStyle = "solid"; // Convert border to solid window frame when active
+                    container.style.borderStyle = "solid";
                     syncStreamlitHeight();
                     
                     currentStream.getVideoTracks()[0].addEventListener('ended', () => {
                         clearStream();
                     });
                 } catch (err) {
-                    console.error("Error securing user presentation capture stream: " + err);
+                    console.error("Capture selection context terminated: " + err);
                 }
             });
 
@@ -212,14 +206,11 @@ with col2:
                 videoElement.style.display = "none";
                 stopBtn.style.display = "none";
                 startBtn.style.display = "block";
-                container.style.borderStyle = "dashed"; // Revert to configuration frame
+                container.style.borderStyle = "dashed";
                 currentStream = null;
                 
                 container.style.width = "100%";
                 container.style.height = "260px";
-                container.style.transform = "none";
-                container.dataset.x = 0;
-                container.dataset.y = 0;
                 syncStreamlitHeight();
             }
 
@@ -278,3 +269,9 @@ with col2:
                 with chat_container.chat_message("assistant"):
                     with st.spinner("Processing analysis blocks..."):
                         client_response = client.models.generate_content(model='gemini-2.5-flash', contents=chat_prompt)
+                        st.markdown(client_response.text)
+                
+                st.session_state.chat_history.append({"role": "assistant", "content": client_response.text})
+                st.rerun()
+        else:
+            st.info("🔒 This portal automatically activates after clicking the main 'Generate Study Guides' trigger on your left.")
