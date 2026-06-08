@@ -146,16 +146,21 @@ with col2:
                 }, '*');
             }
 
-            // Locked-position scaling (Only right and bottom drag anchors enabled)
+            // Locked-position scaling engine
             interact('#resizableContainer').resizable({
                 edges: { right: true, bottom: true },
                 listeners: {
                     move (event) {
-                        // Apply dimensions directly to change size natively without translations
-                        Object.assign(event.target.style, {
-                            width: `${event.rect.width}px`,
-                            height: `${event.rect.height}px`
-                        });
+                        const targetWidth = `${event.rect.width}px`;
+                        const targetHeight = `${event.rect.height}px`;
+
+                        // FORCE both parent box and internal video elements to map explicit dimensions simultaneously
+                        container.style.width = targetWidth;
+                        container.style.height = targetHeight;
+                        
+                        videoElement.style.width = targetWidth;
+                        videoElement.style.height = targetHeight;
+
                         syncStreamlitHeight();
                     }
                 },
@@ -183,6 +188,11 @@ with col2:
                     startBtn.style.display = "none";
                     stopBtn.style.display = "flex";
                     container.style.borderStyle = "solid";
+                    
+                    // Core initialization to match current base layer sizing
+                    videoElement.style.width = container.style.width || "100%";
+                    videoElement.style.height = container.style.height || "260px";
+                    
                     syncStreamlitHeight();
                     
                     currentStream.getVideoTracks()[0].addEventListener('ended', () => {
@@ -211,6 +221,8 @@ with col2:
                 
                 container.style.width = "100%";
                 container.style.height = "260px";
+                videoElement.style.width = "100%";
+                videoElement.style.height = "100%";
                 syncStreamlitHeight();
             }
 
