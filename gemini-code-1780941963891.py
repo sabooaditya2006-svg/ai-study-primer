@@ -3,7 +3,6 @@ from google import genai
 from google.genai import types
 import pypdf
 import io
-import time
 
 # Setup Streamlit page configuration
 st.set_page_config(page_title="AI Study Primer", page_icon="📚", layout="wide")
@@ -32,21 +31,24 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload a PDF lecture/textbook", type=["pdf"])
     
     if uploaded_file:
-        st.success("File uploaded successfully!")
-        
-        # Extract text once and store it in session state
-        if "document_text" not in st.session_state:
-            with st.spinner("Extracting text from PDF..."):
+        # TRACKING FILE CHANGES: If a new file is uploaded, wipe the old data instantly
+        if "current_file_name" not in st.session_state or st.session_state.current_file_name != uploaded_file.name:
+            with st.spinner("Processing new document..."):
                 st.session_state.document_text = extract_text_from_pdf(uploaded_file)
+                st.session_state.current_file_name = uploaded_file.name
+                # Reset all states for the new file
                 st.session_state.primed = False
                 st.session_state.deep_dive = False
+                st.session_state.primer_output = ""
+                st.session_state.deep_output = ""
                 st.session_state.chat_history = []
+        st.success(f"Active: {uploaded_file.name}")
 
 # Layout split: Left side for study materials, Right side for Interactive Q&A
 col1, col2 = st.columns([3, 2])
 
 with col1:
-    if "document_text" in st.session_state:
+    if "document_text" in st.session_state and st.session_state.document_text.strip() != "":
         st.header("📖 Study Materials")
         
         # Button to trigger processing using a single combined call to prevent server errors
@@ -108,7 +110,8 @@ with col1:
 with col2:
     st.header("💬 Question the Material")
     
-    if "document_text" in st.session_state and st.session_state.get("deep_dive"):
+    # UNLOCKED CHECK: Checks if a file is uploaded AND the deep dive processing is complete
+    if "document_text" in st.session_state and st.session_state.get("deep_dive") == True:
         st.write("Ask anything about the text. Challenge assumptions, ask for analogies, or request further clarification.")
         
         # Container to display chat messages
@@ -141,4 +144,4 @@ with col2:
             st.session_state.chat_history.append({"role": "assistant", "content": chat_response.text})
             
     else:
-        st.info("The chat interface will unlock once you upload a document and generate the study guides.")
+        st.info("The chat interface will unlock once you click 'Generate Study Guides' and your materials are ready.")
