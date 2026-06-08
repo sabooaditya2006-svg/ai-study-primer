@@ -9,12 +9,10 @@ import time
 st.set_page_config(page_title="AI Study Primer", page_icon="📚", layout="wide")
 
 # Initialize Gemini Client
-# It automatically looks for an environment variable named GEMINI_API_KEY
-# Or you can paste it directly: client = genai.Client(api_key="YOUR_KEY")
 try:
     client = genai.Client()
 except Exception as e:
-    st.error("Please set your GEMINI_API_KEY environment variable.")
+    st.error("Please set your GEMINI_API_KEY environment variable in Streamlit Secrets.")
 
 # Helper function to extract text from uploaded PDF
 def extract_text_from_pdf(uploaded_file):
@@ -24,7 +22,7 @@ def extract_text_from_pdf(uploaded_file):
         text += page.extract_text() + "\n"
     return text
 
-# Main UI
+# Main UI Configuration
 st.title("📚 AI Material Primer & Deep-Dive Assistant")
 st.subheader("Prime your brain before you dive deep.")
 
@@ -50,71 +48,49 @@ col1, col2 = st.columns([3, 2])
 with col1:
     if "document_text" in st.session_state:
         st.header("📖 Study Materials")
-        # Button to trigger the processing
+        
+        # Button to trigger processing using a single combined call to prevent server errors
         if st.button("Generate Study Guides", type="primary"):
             with st.spinner("Analyzing document and generating summaries..."):
                 
-                # 1. Generate the Broad Primer
-                try:
-                    primer_prompt = (
-                        "You are an expert educator. Provide a HIGH-LEVEL PRIMER of the following text. "
-                        "Your goal is to prepare the student's brain before they study deeply. "
-                        "Focus on: Broad themes, the core 'Why does this matter?', major vocabulary terms without dense definitions, "
-                        "and a mental roadmap of the material. Keep it incredibly simple, bulleted, and highly scannable."
-                        f"\n\nText:\n{st.session_state.document_text[:40000]}"
-                    )
+                combined_prompt = (
+                    "You are an expert educator. I am going to give you a text, and I need you to generate TWO distinct outputs. "
+                    "You MUST separate the two outputs with the exact marker text: ---DEEP_DIVE_SPLIT---\n\n"
                     
-                    primer_response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=primer_prompt,
-                    )
-                    st.session_state.primer_output = primer_response.text
-                    st.session_state.primed = True
-                except Exception as e:
-                    st.error(f"Failed to generate Broad Primer due to a temporary server error. Please try clicking the button again.")
-                    st.session_state.primed = False
-
-                # Give Google's server a 2-second breather before hitting it with the next big request
-                time.sleep(2)
-
-                # 2. Generate the Deep Dive
-                try:
-                    deep_prompt = (
-                        "You are an expert educator. Provide an exhaustive, DEEP DIVE breakdown of the following text. "
-                        "Explain complex mechanisms, mathematical derivations if any, historical/logical contexts, "
-                        "and subtle nuances. Break it down section by section with clear headings. "
-                        "Do not oversimplify; explain things thoroughly as if preparing someone for a rigorous exam."
-                        f"\n\nText:\n{st.session_state.document_text[:40000]}"
-                    )
+                    "OUTPUT 1 (Before the marker): Provide a HIGH-LEVEL PRIMER. Focus on broad themes, the core 'Why does this matter?', "
+                    "major vocabulary terms without dense definitions, and a mental roadmap. Keep it simple, bulleted, and highly scannable.\n\n"
                     
-                    deep_response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=deep_prompt,
-                    )
-                    st.session_state.deep_output = deep_response.text
-                    st.session_state.deep_dive = True
-                except Exception as e:
-                    st.error(f"Failed to generate Deep Dive due to a temporary server error. Please try clicking the button again.")
-                    st.session_state.deep_dive = False
-        
-      
-                # 2. Generate the Deep Dive
-                deep_prompt = (
-                    "You are an expert educator. Provide an exhaustive, DEEP DIVE breakdown of the following text. "
-                    "Explain complex mechanisms, mathematical derivations if any, historical/logical contexts, "
-                    "and subtle nuances. Break it down section by section with clear headings. "
-                    "Do not oversimplify; explain things thoroughly as if preparing someone for a rigorous exam."
-                    f"\n\nText:\n{st.session_state.document_text[:40000]}"
+                    "OUTPUT 2 (After the marker): Provide an exhaustive, DEEP DIVE breakdown. Explain complex mechanisms, logical contexts, "
+                    "and subtle nuances section by section with clear headings. Do not oversimplify.\n\n"
+                    
+                    f"Source Text:\n{st.session_state.document_text[:40000]}"
                 )
                 
-                deep_response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=deep_prompt,
-                )
-                st.session_state.deep_output = deep_response.text
-                st.session_state.deep_dive = True
+                try:
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=combined_prompt,
+                    )
+                    
+                    raw_text = response.text
+                    # Split the single response text using our marker to separate the tabs
+                    if "---DEEP_DIVE_SPLIT---" in raw_text:
+                        parts = raw_text.split("---DEEP_DIVE_SPLIT---")
+                        st.session_state.primer_output = parts[0].strip()
+                        st.session_state.deep_output = parts[1].strip()
+                    else:
+                        st.session_state.primer_output = raw_text
+                        st.session_state.deep_output = "The model forgot to separate the deep dive. You can find the entire response in the first tab or click generate again."
+                    
+                    st.session_state.primed = True
+                    st.session_state.deep_dive = True
+                    
+                except Exception as e:
+                    st.error("Google's free tier servers are currently busy. Please wait 10 seconds and click 'Generate Study Guides' again.")
+                    st.session_state.primed = False
+                    st.session_state.deep_dive = False
 
-        # Display tabs if content has been generated
+        # Display tabs if content has been generated successfully
         if st.session_state.get("primed"):
             tab1, tab2 = st.tabs(["🚀 Broad Primer (Read First)", "🔬 Deep Dive (Read Second)"])
             
@@ -143,16 +119,14 @@ with col2:
                 
         # Chat input field
         if user_query := st.chat_input("What part don't you understand?"):
-            # Display user message
             with chat_container.chat_message("user"):
                 st.markdown(user_query)
             st.session_state.chat_history.append({"role": "user", "content": user_query})
             
-            # Formulate prompt for the chat with the context of the document
             chat_prompt = (
                 "You are an interactive tutor helping a student understand their course material. "
                 "Answer the student's question accurately using the provided source text as your primary truth. "
-                "If they ask for analogies or simplified physics/engineering concepts, provide them, but keep the technical accuracy intact.\n\n"
+                "If they ask for analogies or simplified concepts, provide them, but keep the technical accuracy intact.\n\n"
                 f"Source Text Context:\n{st.session_state.document_text[:30000]}\n\n"
                 f"Student Question: {user_query}"
             )
